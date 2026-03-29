@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FluentType AI Translator</title>
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #f7f9fc;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+}
+
+.translator-container {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.input-area, .output-area {
+  width: 100%;
+  height: 100%;
+  padding: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 0.5rem;
+  resize: none;
+  overflow-y: auto;
+}
+
+.spinner {
+  border: 4px solid rgba(0,0,0,0.1);
+  border-left-color: #3b82f6;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+
+<body>
+
+<div class="translator-container">
+
+  <!-- Header -->
+  <header class="p-4 bg-blue-600 text-white">
+    <h1 class="text-2xl font-bold">FluentType AI</h1>
+  </header>
+
+  <!-- Main -->
+  <main class="flex flex-1 p-4 gap-4">
+
+    <!-- Input -->
+    <div class="flex-1 flex flex-col">
+      <label class="text-sm mb-1">Type Here</label>
+      <textarea id="nativeInput" class="input-area flex-1"></textarea>
+      <p id="wordCount" class="text-xs text-right mt-1">Words: 0</p>
+    </div>
+
+    <!-- Output -->
+    <div class="flex-1 flex flex-col">
+      <label class="text-sm mb-1 flex justify-between">
+        English Translation
+        <span id="loadingIndicator" class="hidden flex items-center text-blue-600 text-sm">
+          <div class="spinner mr-2"></div> Translating...
+        </span>
+      </label>
+
+      <textarea id="englishOutput" class="output-area flex-1" readonly>
+The translation will appear here instantly.
+      </textarea>
+
+      <button id="copyButton"
+        class="mt-2 bg-green-500 text-white p-2 rounded disabled:bg-green-300"
+        disabled>
+        Copy
+      </button>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const nativeInput = document.getElementById('nativeInput');
+const englishOutput = document.getElementById('englishOutput');
+const loadingIndicator = document.getElementById('loadingIndicator');
+const wordCountDisplay = document.getElementById('wordCount');
+const copyButton = document.getElementById('copyButton');
+
+// debounce
+const debounce = (func, delay) => {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), delay);
+  };
+};
+
+// API call
+const translateText = async (text) => {
+  if (!text.trim()) {
+    englishOutput.value = "The translation will appear here instantly.";
+    copyButton.disabled = true;
+    return;
+  }
+
+  loadingIndicator.classList.remove('hidden');
+
+  try {
+    const response = await fetch('/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, sourceLang: 'auto' })
+    });
+
+    const data = await response.json();
+
+    // 🔥 SHOW REAL ERROR
+    if (data.error) {
+      englishOutput.value = "❌ " + data.error;
+      copyButton.disabled = true;
+    } else {
+      englishOutput.value = data.translatedText;
+      copyButton.disabled = false;
+    }
+
+  } catch (err) {
+    englishOutput.value = "❌ Network error";
+    console.error(err);
+  } finally {
+    loadingIndicator.classList.add('hidden');
+  }
+};
+
+// input handler
+const handleInputChange = () => {
+  const text = nativeInput.value;
+
+  const wordCount = text.trim().split(/\s+/).filter(w => w).length;
+  wordCountDisplay.textContent = "Words: " + wordCount;
+
+  debouncedTranslate(text);
+};
+
+const debouncedTranslate = debounce(translateText, 500);
+
+nativeInput.addEventListener('input', handleInputChange);
+
+// copy
+copyButton.addEventListener('click', () => {
+  navigator.clipboard.writeText(englishOutput.value);
+  copyButton.textContent = "Copied!";
+  setTimeout(() => copyButton.textContent = "Copy", 1500);
+});
+</script>
+
+</body>
+</html>
